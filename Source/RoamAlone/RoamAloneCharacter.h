@@ -10,7 +10,17 @@
 class USpringArmComponent;
 class UCameraComponent;
 class UInputAction;
+class AGreyboxVan;
+class UVanPromptWidget;
+class UInteractionComponent;
 struct FInputActionValue;
+
+UENUM(BlueprintType)
+enum class EVanViewMode : uint8
+{
+	Outside,
+	Inside
+};
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
@@ -30,6 +40,15 @@ class ARoamAloneCharacter : public ACharacter
 	/** Follow camera */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
 	UCameraComponent* FollowCamera;
+
+	UPROPERTY(VisibleAnywhere, Category="Components")
+	TObjectPtr<UCameraComponent> FirstPersonCamera;
+
+	UPROPERTY(VisibleAnywhere, Category="Components")
+	TObjectPtr<USkeletalMeshComponent> FirstPersonBody;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta=(AllowPrivateAccess="true"))
+	TObjectPtr<UInteractionComponent> Interaction;
 	
 protected:
 
@@ -49,12 +68,40 @@ protected:
 	UPROPERTY(EditAnywhere, Category="Input")
 	UInputAction* MouseLookAction;
 
+	UPROPERTY(EditDefaultsOnly, Category="Input")
+	TObjectPtr<UInputAction> InteractAction;
+
+	UPROPERTY(EditDefaultsOnly, Category="Camera", meta=(Units="cm"))
+	FVector InteriorEyeOffset = FVector(8, 0, 64);
+
+	UPROPERTY(EditDefaultsOnly, Category="Camera", meta=(ClampMin="60", ClampMax="110", Units="deg"))
+	float InteriorFieldOfView = 85;
+
+	UPROPERTY(EditDefaultsOnly, Category="Movement", meta=(ClampMin="50", Units="cm/s"))
+	float InteriorWalkSpeed = 180;
+
 public:
 
 	/** Constructor */
 	ARoamAloneCharacter();	
 
+	virtual void Tick(float DeltaSeconds) override;
+	virtual void PawnClientRestart() override;
+	void SetNearbyVan(AGreyboxVan* Van);
+	AGreyboxVan* GetNearbyVan() const;
+
+	UFUNCTION(BlueprintPure, Category="Camera")
+	EVanViewMode GetVanViewMode() const { return VanViewMode; }
+
+	UCameraComponent* GetFirstPersonCamera() const { return FirstPersonCamera; }
+	USkeletalMeshComponent* GetFirstPersonBody() const { return FirstPersonBody; }
+
+	UFUNCTION(BlueprintPure, Category="Interaction")
+	UInteractionComponent* GetInteractionComponent() const { return Interaction; }
+
 protected:
+	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 	/** Initialize input action bindings */
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
@@ -84,6 +131,28 @@ public:
 	/** Handles jump pressed inputs from either controls or UI interfaces */
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoJumpEnd();
+
+private:
+	void SetVanViewMode(EVanViewMode NewMode);
+	void UpdatePrototypePrompt();
+
+	UFUNCTION()
+	void HandleInteractionPresentationChanged(const FText& Prompt, const FText& Feedback);
+
+	UPROPERTY(VisibleInstanceOnly, Category="Camera")
+	EVanViewMode VanViewMode = EVanViewMode::Outside;
+
+	UPROPERTY(Transient)
+	TWeakObjectPtr<AGreyboxVan> NearbyVan;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UVanPromptWidget> VanPrompt;
+
+	float OutsideWalkSpeed = 500;
+	float OutsidePitchMin = -89.9f;
+	float OutsidePitchMax = 89.9f;
+	bool bOutsideOrientToMovement = true;
+	bool bOutsideUseControllerYaw = false;
 
 public:
 

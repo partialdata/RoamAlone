@@ -35,7 +35,7 @@ The first milestone contains **one campsite, one stationary van with an accessib
 Required loop:
 
 1. Start at the campsite with a clear immediate objective.
-2. Explore outside in third person using Manny and template locomotion.
+2. Explore outside in third person using Quinn and template locomotion.
 3. Interact with a small number of useful props and the van door.
 4. Enter the van and switch to true first person.
 5. Close and lock the door, perceive an escalating disturbance, and make at least one meaningful response.
@@ -104,17 +104,18 @@ This is guidance, not a quota. A small Blueprint prototype is valid. Move behavi
 - Use `BlueprintImplementableEvent` or `BlueprintNativeEvent` for a real presentation/customization seam. Preserve gameplay invariants in the validating operation.
 - Keep Blueprint graphs readable with named functions, useful comments, and clear execution flow. Prefer functions over large repeated graphs or macro libraries.
 - Use instance-editable properties for a handful of settings. Introduce Data Assets only when repeated configurations make them useful.
+- Assemble greybox models, materials, doors, handles, and window geometry in Unreal Blueprint assets. Keep C++ focused on gameplay logic and necessary gameplay components; do not generate the van's model in its native constructor. A handle belongs to the moving door assembly; any fixed inside switch must be visibly mounted on the wall.
 
-## Player, Manny, and camera rules
+## Player, Quinn, and camera rules
 
-**Manny is the player placeholder.** Reuse Epic's mannequin skeleton, template Animation Blueprint, and available locomotion. Use simple geometry and temporary sounds elsewhere. Do not block gameplay on MetaHumans, custom rigs, motion matching, bespoke IK, or polished entry animations.
+**Quinn is the player placeholder, as explicitly requested by the user.** Reuse Epic's mannequin skeleton, template Animation Blueprint, and available locomotion. Use simple geometry and temporary sounds elsewhere. Do not block gameplay on MetaHumans, custom rigs, motion matching, bespoke IK, or polished entry animations.
 
 - Outside: third-person camera on a Spring Arm with appropriate collision handling.
 - Inside: **true first person means an embodied, eye-level view tied to the playable character**, with the body visible when looking down where practical. A close third-person camera or detached inspection camera does not satisfy this requirement.
 - Prefer the same possessed Character in both modes. Use a small explicit mode such as `Outside`, `Transitioning`, and `Inside`; restore the previous valid state if a transition cannot complete.
 - Keep first-person camera motion stable. Do not directly inherit all head-bone animation shake. Tune the eye offset, look limits, FOV, and body visibility in the actual van.
 - Solve head/face clipping with a deliberate local-view mesh/visibility setup. Preserve an appropriate world representation for shadows and reflections. Inspect Epic's native First Person Rendering support if useful; it does not replace collision or entry/exit logic.
-- Build the interior to a playable scale and test it with Manny's capsule early. Change collision or crouch behavior deliberately; never disable all collision to force the character inside.
+- Build the interior to a playable scale and test it with Quinn's capsule early. Change collision or crouch behavior deliberately; never disable all collision to force the character inside.
 - For the stationary prototype, keep interior and exterior in the same world. Validate a swept destination or suitable clearance check before moving the character to an entry/exit marker. A short fade is acceptable for a constrained doorway.
 - Do not mark a transition complete until the destination, camera, movement, and input setup are valid. Prevent overlapping transitions and repeated interaction from leaving input disabled.
 - At doorframes and windows, test third-person camera peeking, first-person wall clipping, low ceilings, fast look movement, and blocked exits. Avoid separate interior maps, duplicate pawns, or render-target windows without a demonstrated need.

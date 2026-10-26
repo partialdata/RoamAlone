@@ -1,0 +1,38 @@
+# Generated Unreal files, including generated files inside plugins.
+Binaries/
+Intermediate/
+Saved/
+DerivedDataCache/
+
+# Local IDE state and generated solutions. Keep .vsconfig (toolchain requirements).
+.idea/
+.vs/
+*.sln
+*.slnx
+*.suo
+*.sdf
+*.opensdf
+*.VC.db
+*.VC.opendb
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+
+# Rider installs and updates this editor integration locally.
+# Project-owned plugins elsewhere in Plugins remain eligible for tracking.
+/Plugins/Developer/RiderLink/
+
+# Personal editor content and generated cook/package output.
+/Content/Developers/
+/Build/*/FileOpenOrder/
+/Build/Receipts/
+/StagedBuilds/
+/PackagedBuilds/
+
+# OS metadata.
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Keep Source, Config, Content, Build resources, .uproject, and .uplugin files.
+# Content/__ExternalActors__ and Content/__ExternalObjects__ are required map data.

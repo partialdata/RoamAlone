@@ -13,9 +13,13 @@ class ROAMALONE_API UVanPromptWidget : public UUserWidget
 	GENERATED_BODY()
 public:
 	void SetPrompt(const FText& Text);
+	void SetReticleVisible(bool bVisible);
 protected:
 	virtual void NativeOnInitialized() override;
 private:
 	UPROPERTY(Transient)
 	TObjectPtr<UTextBlock> Prompt;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UTextBlock> Reticle;
 };

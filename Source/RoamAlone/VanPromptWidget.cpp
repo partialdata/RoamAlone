@@ -20,8 +20,9 @@ void UVanPromptWidget::NativeOnInitialized()
 	PromptSlot->SetPosition(FVector2D(28, 28));
 	PromptSlot->SetAutoSize(true);
 
-	UTextBlock* Reticle = WidgetTree->ConstructWidget<UTextBlock>();
+	Reticle = WidgetTree->ConstructWidget<UTextBlock>();
 	Reticle->SetText(FText::FromString(TEXT("+")));
+	Reticle->SetVisibility(ESlateVisibility::Collapsed);
 	UCanvasPanelSlot* ReticleSlot = Canvas->AddChildToCanvas(Reticle);
 	ReticleSlot->SetAnchors(FAnchors(0.5, 0.5));
 	ReticleSlot->SetAlignment(FVector2D(0.5, 0.5));
@@ -34,5 +35,13 @@ void UVanPromptWidget::SetPrompt(const FText& Text)
 	if (Prompt && !Prompt->GetText().EqualTo(Text))
 	{
 		Prompt->SetText(Text);
+	}
+}
+
+void UVanPromptWidget::SetReticleVisible(bool bVisible)
+{
+	if (Reticle)
+	{
+		Reticle->SetVisibility(bVisible ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
 	}
 }

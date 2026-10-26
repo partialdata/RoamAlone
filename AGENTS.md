@@ -146,6 +146,10 @@ Do not add lockpicking, individual keys, battery dependencies, or multiple lock 
 
 UDS means **Ultra Dynamic Sky**, with Ultra Dynamic Weather if that asset is installed. It is a third-party product, not an Epic engine feature. Its installed version and documentation must be checked separately from UE 5.8.
 
+- **Installed release: UDS 9.7**, verified from `UDS_CurrentVersion` on October 26, 2026. The asset is installed under `/Game/UltraDynamicSky`; it is content, not a native UDS runtime module.
+- Use the [Ultra Dynamic Sky / Weather 9.7 documentation](https://www.ultradynamicsky.com/Documentation/V9/9-7) for this installation. Check the installed version again after vendor updates before choosing a different manual.
+- The prototype map uses the project-owned child `/Game/VanPrototype/Blueprints/BP_CampsiteNightSky` for night presentation. Tune this child or its placed instance; leave `/Game/UltraDynamicSky` vendor assets unchanged. Keep one sky/time authority and remove redundant standalone environment lights, atmosphere, clouds, and fog when using UDS' built-in components, following the vendor setup instructions.
+
 - Use UDS for sky and environmental time; use UDW for weather effects when available. Do not build a competing sky/weather system.
 - The night director owns narrative progression. It requests environmental changes through a small project-owned Blueprint integration point using the installed vendor API. Do not invent function names or compile against an assumed native UDS class.
 - Prefer a placed reference and a few explicit calls over a generic weather-provider framework. Do not scatter UDS casts and property writes across interaction actors.

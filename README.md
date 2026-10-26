@@ -114,3 +114,28 @@ when deactivated or destroyed. It keeps weak references to targets and cameras.
 Run `RoamAlone.Interaction` for stale-focus, obstruction, target destruction,
 component activation, and surface-filtering checks, plus `RoamAlone.Van` for
 door and camera regressions.
+
+## UDS night presentation
+
+The prototype map uses the project-owned `BP_CampsiteNightSky` child of
+`/Game/UltraDynamicSky/Blueprints/Ultra_Dynamic_Sky`. Installed content reports
+**9.7**; use the [vendor's 9.7 documentation](https://www.ultradynamicsky.com/Documentation/V9/9-7).
+The child owns the preset, with no vendor asset edits or native UDS dependency.
+
+**Fresh clones require a licensed local installation of Ultra Dynamic Sky 9.7.**
+Add the purchased content to this project at `Content/UltraDynamicSky` before
+opening the prototype map or its sky Blueprint. This public repository excludes
+the vendor pack from version control; it tracks our child Blueprint and map.
+
+Time of Day is **2350 (23:30)**. Time animation, random starting time, system
+time, and randomized cloud formation are disabled for repeatable playtests.
+Cloud Coverage is 5.5, Fog is 0.3, Night Brightness is 0.65, moon intensity is
+0.4, and the moon light color is cool blue. UDS controls exposure with an
+EV100 range of -4.5 to 0.5 and night exposure bias -0.25. Tune the child or the
+placed actor in Unreal; keep UDS as the sky/light/time authority.
+
+The previous standalone directional light, sky light, and sky atmosphere were
+replaced by UDS' built-in environment components. The existing interior light
+is movable, warm (2900 K), 25 lumens, with a 360 cm attenuation radius.
+UDW content is installed, but no weather actor or precipitation is enabled in
+this scene; indoor rain exclusion and weather audio remain untested.

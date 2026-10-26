@@ -96,6 +96,8 @@ assert unreal.BlueprintEditorLibrary.compile_blueprint(van_bp)
 assert assets.save_loaded_asset(van_bp)
 
 if not assets.does_asset_exist(MAP):
+    night_sky = unreal.load_asset(ROOT + '/Blueprints/BP_CampsiteNightSky')
+    assert night_sky, 'Restore BP_CampsiteNightSky and the installed UDS 9.7 content before creating the map.'
     assets.make_directory(ROOT + '/Maps')
     assert levels.new_level(MAP)
 
@@ -111,16 +113,15 @@ if not assets.does_asset_exist(MAP):
 
     start = actors.spawn_actor_from_class(unreal.PlayerStart, unreal.Vector(-15, -400, 100), unreal.Rotator(pitch=0, yaw=90, roll=0))
     start.set_actor_label('Van Test Player Start')
-    sun = actors.spawn_actor_from_class(unreal.DirectionalLight, unreal.Vector(0, 0, 650), unreal.Rotator(pitch=-40, yaw=-35, roll=0))
-    sun.light_component.set_editor_property('intensity', 5.0)
-    sun.light_component.set_editor_property('atmosphere_sun_light', True)
-    actors.spawn_actor_from_class(unreal.SkyAtmosphere, unreal.Vector(0, 0, 0))
-    skylight = actors.spawn_actor_from_class(unreal.SkyLight, unreal.Vector(0, 0, 400))
-    skylight.light_component.set_editor_property('intensity', 1.0)
-    skylight.light_component.set_editor_property('real_time_capture', True)
+    sky = actors.spawn_actor_from_class(night_sky.generated_class(), unreal.Vector(0, 0, 0))
+    sky.set_actor_label('Campsite Night Sky (UDS 9.7)')
     lamp = actors.spawn_actor_from_class(unreal.PointLight, unreal.Vector(0, 0, 235))
-    lamp.light_component.set_editor_property('intensity', 1.0)
-    lamp.light_component.set_editor_property('attenuation_radius', 450.0)
+    lamp.light_component.set_editor_property('mobility', unreal.ComponentMobility.MOVABLE)
+    lamp.light_component.set_editor_property('intensity_units', unreal.LightUnits.LUMENS)
+    lamp.light_component.set_editor_property('intensity', 25.0)
+    lamp.light_component.set_editor_property('attenuation_radius', 360.0)
+    lamp.light_component.set_editor_property('use_temperature', True)
+    lamp.light_component.set_editor_property('temperature', 2900.0)
     lamp.set_actor_label('Temporary Interior Light')
     settings = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world().get_world_settings()
     settings.set_editor_property('default_game_mode', unreal.load_class(None, '/Game/ThirdPerson/Blueprints/BP_ThirdPersonGameMode.BP_ThirdPersonGameMode_C'))

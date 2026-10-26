@@ -290,6 +290,7 @@ void ARoamAloneCharacter::UpdatePrototypePrompt()
 		Message += TEXT("\n") + Feedback.ToString();
 	}
 	VanPrompt->SetPrompt(FText::FromString(Message));
+	VanPrompt->SetReticleVisible(VanViewMode == EVanViewMode::Inside);
 }
 
 void ARoamAloneCharacter::HandleInteractionPresentationChanged(const FText& Prompt, const FText& Feedback)

@@ -24,6 +24,8 @@ DerivedDataCache/
 
 # Personal editor content and generated cook/package output.
 /Content/Developers/
+# Purchased vendor content: install UDS 9.7 locally; do not redistribute in this public repository.
+/Content/UltraDynamicSky/
 /Build/*/FileOpenOrder/
 /Build/Receipts/
 /StagedBuilds/

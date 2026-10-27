@@ -8,6 +8,15 @@ Build a small, playable, single-player horror prototype that one developer can f
 
 This file governs agents working in the game repository. Place it beside the `.uproject` file. Follow more specific instructions in nested `AGENTS.md` files where applicable; explicit user instructions take priority. Class names below describe responsibilities, not a requirement to generate every class immediately.
 
+## Design document and decision authority
+
+- The editable game design reference is [Roam Alone Game Design Document](Design/Roam_Alone_Game_Design_Document.docx). The [PDF companion](Design/Roam_Alone_Game_Design_Document.pdf) is for convenient reading. Both live in `D:\unrealProjects\RoamAlone\Design`; the current revision is **0.2**, dated **October 27, 2026**.
+- Read the relevant design sections and decision log before changing gameplay, narrative, pacing, controls, or scope. Extract DOCX text with an appropriate document reader when needed; do not rely solely on the filename or a previous chat summary.
+- Preserve the document's status distinctions: **CONFIRMED** is the supplied design baseline, **PROPOSED** is a recommendation to evaluate, and **OPEN** is an unresolved choice. A proposed scare, input mapping, checkpoint scheme, or failure outcome is not automatically an approved requirement.
+- Explicit user instructions and later user-approved decisions take priority. This file supplies implementation rules and the prototype contract; the design document supplies the broader experience and production plan. Preserve the more specific existing project rules, and surface any material conflict before implementing the conflicting choice.
+- **Quinn is the confirmed female prototype player model.** Keep the immediate scope at one van, one campsite, one playable night, and one compelling authored horror event with a complete resolution. Later campsite episodes, travel polish, and AI-generated vlog footage remain outside the immediate milestone unless requested.
+- When an authorized design change alters the baseline, update the relevant design text and decision log, increment the revision, and regenerate the PDF companion. Keep the project-local DOCX and PDF consistent; routine implementation changes do not require rewriting the design document.
+
 ## Engine and documentation baseline
 
 - Target **Unreal Engine 5.8**, using C++ and Blueprints together.

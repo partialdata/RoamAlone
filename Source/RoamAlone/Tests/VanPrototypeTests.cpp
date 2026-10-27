@@ -6,6 +6,7 @@
 #include "InteractionComponent.h"
 #include "Interactable.h"
 #include "Camera/CameraComponent.h"
+#include "Camera/CameraTypes.h"
 #include "Components/BoxComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/Engine.h"
@@ -154,6 +155,77 @@ bool FVanCameraRoundTripTest::RunTest(const FString& Parameters)
 	Test.Van->Destroy();
 	Test.Character->Tick(1.0f / 60);
 	TestEqual(TEXT("Removing van safely restores outside view"), Test.Character->GetVanViewMode(), EVanViewMode::Outside);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVanExitCameraBlendTest, "RoamAlone.Van.ExitCameraBlend",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVanExitCameraBlendTest::RunTest(const FString& Parameters)
+{
+	FVanTestWorld Test;
+	if (!TestNotNull(TEXT("Template character loads"), Test.Character)) return false;
+	Test.Van->TrySetDoorOpen(true);
+	Test.Move(FVector(-15, -7.5, 161.1));
+	FMinimalViewInfo InsideView;
+	Test.Character->CalcCamera(0.0f, InsideView);
+	// Cross the threshold without a time step so the first outgoing frame is observable.
+	Test.Character->SetActorLocation(FVector(-15, -100, 161.1));
+	FMinimalViewInfo LastEyeView;
+	Test.Character->CalcCamera(0.0f, LastEyeView);
+	Test.Character->Tick(0.0f);
+	const FVector Target(-15, -420, 225.1);
+	Test.Character->GetFollowCamera()->SetWorldLocation(Target);
+	FMinimalViewInfo StartView;
+	Test.Character->CalcCamera(0.0f, StartView);
+	TestTrue(TEXT("Exit begins a camera blend"), Test.Character->IsCameraTransitionActive());
+	TestTrue(TEXT("First outgoing frame starts at the eye view without a positional cut"), StartView.Location.Equals(LastEyeView.Location, 0.1));
+	TestTrue(TEXT("First outgoing FOV is continuous"), FMath::IsNearlyEqual(StartView.FOV, LastEyeView.FOV));
+	Test.Character->Tick(0.2f);
+	FMinimalViewInfo MidView;
+	Test.Character->CalcCamera(0.0f, MidView);
+	TestTrue(TEXT("Intermediate frame moves towards third person"),
+		FVector::Dist(MidView.Location, Target) < FVector::Dist(StartView.Location, Target)
+		&& FVector::Dist(MidView.Location, Target) > 1.0f);
+	TestTrue(TEXT("FOV also eases between the camera settings"), MidView.FOV > StartView.FOV && MidView.FOV < Test.Character->GetFollowCamera()->FieldOfView);
+	Test.Character->Tick(1.0f);
+	FMinimalViewInfo EndView;
+	Test.Character->CalcCamera(0.0f, EndView);
+	TestFalse(TEXT("Exit blend finishes"), Test.Character->IsCameraTransitionActive());
+	TestTrue(TEXT("Finished view reaches the third-person camera"), EndView.Location.Equals(Target, 0.1));
+	TestTrue(TEXT("Pawn possession remains unchanged"), Test.Controller->GetPawn() == Test.Character);
+
+	Test.Move(FVector(-15, -7.5, 161.1));
+	Test.Character->SetActorLocation(FVector(-15, -100, 161.1));
+	Test.Character->Tick(0.0f);
+	Test.Character->GetFollowCamera()->SetWorldLocation(Target);
+	Test.Character->Tick(0.2f);
+	Test.Character->CalcCamera(0.0f, MidView);
+	Test.Character->SetActorLocation(FVector(-15, -7.5, 161.1));
+	FMinimalViewInfo BeforeReverse;
+	Test.Character->CalcCamera(0.0f, BeforeReverse);
+	Test.Character->Tick(0.0f);
+	FMinimalViewInfo AfterReverse;
+	Test.Character->CalcCamera(0.0f, AfterReverse);
+	TestTrue(TEXT("Stepping back inside reverses from the current view"), AfterReverse.Location.Equals(BeforeReverse.Location, 0.1));
+	Test.Character->Tick(1.0f);
+	Test.Character->CalcCamera(0.0f, EndView);
+	TestTrue(TEXT("Interrupted exit settles at first person"), EndView.Location.Equals(InsideView.Location, 0.1));
+	TestTrue(TEXT("Embodied first-person body is restored"), Test.Character->GetFirstPersonBody()->IsVisible());
+
+	Test.Character->SetActorLocation(FVector(-15, -100, 161.1));
+	Test.Character->Tick(0.0f);
+	Test.Character->GetFollowCamera()->SetWorldLocation(Target);
+	AActor* Obstruction = Test.World->SpawnActor<AActor>();
+	UBoxComponent* Wall = NewObject<UBoxComponent>(Obstruction);
+	Obstruction->SetRootComponent(Wall);
+	Wall->SetBoxExtent(FVector(150, 5, 200));
+	Wall->SetCollisionProfileName(TEXT("BlockAll"));
+	Wall->RegisterComponent();
+	Obstruction->SetActorLocation(FVector(-15, -150, 200));
+	Test.Character->Tick(0.3f);
+	Test.Character->CalcCamera(0.0f, MidView);
+	TestTrue(TEXT("Intermediate camera sweep stays on the near side of a wall"), MidView.Location.Y > -145.0f);
 	return true;
 }
 

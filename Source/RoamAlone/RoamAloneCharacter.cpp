@@ -189,6 +189,8 @@ void ARoamAloneCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Interaction->OnPresentationChanged.RemoveDynamic(this, &ARoamAloneCharacter::HandleInteractionPresentationChanged);
 	SetVanViewMode(EVanViewMode::Outside);
+	bBlendingCamera = false;
+	UpdateCameraBodyVisibility(false);
 	if (VanPrompt)
 	{
 		VanPrompt->RemoveFromParent();
@@ -217,6 +219,51 @@ void ARoamAloneCharacter::Tick(float DeltaSeconds)
 	const AGreyboxVan* Van = NearbyVan.Get();
 	const bool bInside = Van && Van->ContainsInteriorPoint(GetActorLocation(), VanViewMode == EVanViewMode::Inside);
 	SetVanViewMode(bInside ? EVanViewMode::Inside : EVanViewMode::Outside);
+	if (bBlendingCamera)
+	{
+		CameraBlendElapsed += FMath::Max(0.0f, DeltaSeconds);
+		if (CameraBlendElapsed >= ExitCameraBlendDuration)
+		{
+			bBlendingCamera = false;
+			UpdateCameraBodyVisibility(VanViewMode == EVanViewMode::Inside);
+			Interaction->SetViewSource(VanViewMode == EVanViewMode::Inside ? FirstPersonCamera.Get() : FollowCamera);
+		}
+	}
+}
+
+void ARoamAloneCharacter::CalcCamera(float DeltaTime, FMinimalViewInfo& OutResult)
+{
+	Super::CalcCamera(DeltaTime, OutResult);
+	if (!bBlendingCamera)
+	{
+		return;
+	}
+
+	const float Progress = FMath::Clamp(CameraBlendElapsed / FMath::Max(ExitCameraBlendDuration, UE_SMALL_NUMBER), 0.0f, 1.0f);
+	const float Alpha = FMath::SmoothStep(0.0f, 1.0f, Progress);
+	OutResult.Location = FMath::Lerp(CameraBlendStartLocation, OutResult.Location, Alpha);
+	OutResult.FOV = FMath::Lerp(CameraBlendStartFOV, OutResult.FOV, Alpha);
+	// Keep look input live. Only position and FOV blend; the target camera supplies rotation and lens settings.
+	// The spring arm protects the destination. Also sweep the intermediate view so it cannot cut through a wall.
+	FHitResult Hit;
+	FCollisionQueryParams Query(SCENE_QUERY_STAT(VanCameraBlend), false, this);
+	if (GetWorld()->SweepSingleByChannel(Hit, GetPawnViewLocation(), OutResult.Location,
+		FQuat::Identity, CameraBoom->ProbeChannel,
+		FCollisionShape::MakeSphere(FMath::Max(1.0f, CameraBoom->ProbeSize)), Query))
+	{
+		OutResult.Location = Hit.bStartPenetrating ? GetPawnViewLocation() : Hit.Location;
+	}
+	const float BodyClearance = GetCapsuleComponent()->GetScaledCapsuleRadius() + 20.0f;
+	UpdateCameraBodyVisibility(FVector::DistSquared(OutResult.Location, GetPawnViewLocation()) < FMath::Square(BodyClearance));
+}
+
+void ARoamAloneCharacter::UpdateCameraBodyVisibility(bool bFirstPerson)
+{
+	if (FirstPersonBody->IsVisible() != bFirstPerson)
+	{
+		GetMesh()->SetFirstPersonPrimitiveType(bFirstPerson ? EFirstPersonPrimitiveType::WorldSpaceRepresentation : EFirstPersonPrimitiveType::None);
+		FirstPersonBody->SetVisibility(bFirstPerson);
+	}
 }
 
 void ARoamAloneCharacter::SetVanViewMode(EVanViewMode NewMode)
@@ -227,6 +274,13 @@ void ARoamAloneCharacter::SetVanViewMode(EVanViewMode NewMode)
 	}
 	APlayerController* Player = Cast<APlayerController>(GetController());
 	const bool bInside = NewMode == EVanViewMode::Inside;
+	// Reverse an interrupted exit from its current view rather than restarting from either camera endpoint.
+	const bool bShouldBlend = ExitCameraBlendDuration > 0.0f && (bBlendingCamera || !bInside);
+	FMinimalViewInfo PreviousView;
+	if (bShouldBlend)
+	{
+		CalcCamera(0.0f, PreviousView);
+	}
 	if (bInside)
 	{
 		OutsideWalkSpeed = GetCharacterMovement()->MaxWalkSpeed;
@@ -251,12 +305,19 @@ void ARoamAloneCharacter::SetVanViewMode(EVanViewMode NewMode)
 		Player->PlayerCameraManager->ViewPitchMin = bInside ? -75 : OutsidePitchMin;
 		Player->PlayerCameraManager->ViewPitchMax = bInside ? 80 : OutsidePitchMax;
 	}
-	GetMesh()->SetFirstPersonPrimitiveType(bInside ? EFirstPersonPrimitiveType::WorldSpaceRepresentation : EFirstPersonPrimitiveType::None);
-	FirstPersonBody->SetVisibility(bInside);
 	FollowCamera->SetActive(!bInside);
 	FirstPersonCamera->SetActive(bInside);
 	VanViewMode = NewMode;
-	Interaction->SetViewSource(bInside ? FirstPersonCamera.Get() : FollowCamera);
+	bBlendingCamera = bShouldBlend;
+	if (bBlendingCamera)
+	{
+		CameraBlendStartLocation = PreviousView.Location;
+		CameraBlendStartFOV = PreviousView.FOV;
+		CameraBlendElapsed = 0.0f;
+	}
+	UpdateCameraBodyVisibility(bInside || bBlendingCamera);
+	// During a blend, aim from the rendered PlayerController view, not an endpoint camera.
+	Interaction->SetViewSource(bBlendingCamera ? nullptr : bInside ? FirstPersonCamera.Get() : FollowCamera);
 	UpdatePrototypePrompt();
 }
 

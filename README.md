@@ -38,7 +38,12 @@ and press **E**
 (gamepad **X / left face button**) to slide it open. The panel's destination
 must be clear; normal close-range interaction is allowed.
 Walk through the doorway to switch to eye-level first person. Walk outside
-to restore the template's third-person camera. The door can be closed and
+to restore the template's third-person camera through a short position/FOV
+blend. Tune **Exit Camera Blend Duration** on `BP_ThirdPersonCharacter`
+(default 0.45 seconds; zero restores an instant switch). Look and movement
+stay live; stepping back inside reverses an unfinished blend. Intermediate
+camera positions use the spring arm's collision probe, and the local body
+remains headless until the view clears the character. The door can be closed and
 reopened from inside; its position alone does not change the view.
 
 Use the wall-mounted switch beside the door to operate it from inside.
@@ -46,10 +51,18 @@ The handle is attached to the sliding door and moves with it.
 
 The original Third Person map is preserved. The same possessed Character and
 Enhanced Input movement/look bindings work in both camera modes. Inside,
-walking is slower and jumping is disabled. Window panes block the capsule and
+walking is slower. Jumping is disabled everywhere through Character Movement's
+**Can Jump** capability, and Space / gamepad jump mappings are removed from
+`IMC_Default`. Normal walking, gravity, and the 45 cm step-up height remain enabled.
+Window panes block the capsule and
 third-person spring arm; the local body hides the neck/head while the full
 world mesh supplies shadows and reflections. Door animation and locking are
 not part of this slice.
+
+The player Blueprint uses a deliberate walking pace: **180 cm/s outside**
+(`Character Movement → Max Walk Speed`) and **120 cm/s inside**
+(`Interior Walk Speed`). Tune these in `BP_ThirdPersonCharacter`; the van
+transition caches and restores the configured outside speed.
 
 Edit the van's walls, windows, panel, handle, and switch directly in the
 Components viewport of `/Game/VanPrototype/Blueprints/BP_GreyboxVan`.

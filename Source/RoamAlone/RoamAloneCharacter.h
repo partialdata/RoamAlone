@@ -77,6 +77,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="Camera", meta=(ClampMin="60", ClampMax="110", Units="deg"))
 	float InteriorFieldOfView = 85;
 
+	/** Time to ease from eye level back to the collision-tested third-person camera. Zero disables blending. */
+	UPROPERTY(EditDefaultsOnly, Category="Camera", meta=(ClampMin="0", ClampMax="2", Units="s"))
+	float ExitCameraBlendDuration = 0.45f;
+
 	UPROPERTY(EditDefaultsOnly, Category="Movement", meta=(ClampMin="50", Units="cm/s"))
 	float InteriorWalkSpeed = 180;
 
@@ -86,12 +90,16 @@ public:
 	ARoamAloneCharacter();	
 
 	virtual void Tick(float DeltaSeconds) override;
+	virtual void CalcCamera(float DeltaTime, FMinimalViewInfo& OutResult) override;
 	virtual void PawnClientRestart() override;
 	void SetNearbyVan(AGreyboxVan* Van);
 	AGreyboxVan* GetNearbyVan() const;
 
 	UFUNCTION(BlueprintPure, Category="Camera")
 	EVanViewMode GetVanViewMode() const { return VanViewMode; }
+
+	UFUNCTION(BlueprintPure, Category="Camera")
+	bool IsCameraTransitionActive() const { return bBlendingCamera; }
 
 	UCameraComponent* GetFirstPersonCamera() const { return FirstPersonCamera; }
 	USkeletalMeshComponent* GetFirstPersonBody() const { return FirstPersonBody; }
@@ -135,6 +143,7 @@ public:
 private:
 	void SetVanViewMode(EVanViewMode NewMode);
 	void UpdatePrototypePrompt();
+	void UpdateCameraBodyVisibility(bool bFirstPerson);
 
 	UFUNCTION()
 	void HandleInteractionPresentationChanged(const FText& Prompt, const FText& Feedback);
@@ -153,6 +162,10 @@ private:
 	float OutsidePitchMax = 89.9f;
 	bool bOutsideOrientToMovement = true;
 	bool bOutsideUseControllerYaw = false;
+	FVector CameraBlendStartLocation = FVector::ZeroVector;
+	float CameraBlendStartFOV = 85.0f;
+	float CameraBlendElapsed = 0.0f;
+	bool bBlendingCamera = false;
 
 public:
 

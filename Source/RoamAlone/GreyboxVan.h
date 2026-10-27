@@ -27,6 +27,13 @@ public:
 	UFUNCTION(BlueprintPure, Category="Van|Door")
 	bool IsDoorOpen() const { return bDoorOpen; }
 
+	/** Locking requires a ready, closed door and an assigned inside unlock control. */
+	UFUNCTION(BlueprintCallable, Category="Van|Door")
+	bool TrySetLocked(bool bLocked);
+
+	UFUNCTION(BlueprintPure, Category="Van|Door")
+	bool IsLocked() const { return bDoorLocked; }
+
 	bool IsDoorComponent(const UPrimitiveComponent* Component) const;
 
 	virtual FText GetInteractionPrompt_Implementation(APawn* Interactor, const FHitResult& Hit) const override;
@@ -46,6 +53,10 @@ protected:
 	/** Separate wall-mounted switch for closing the parked door from inside. */
 	UPROPERTY(EditDefaultsOnly, Category="Van|Door", meta=(UseComponentPicker, AllowedClasses="/Script/Engine.PrimitiveComponent"))
 	FComponentReference InsideSwitchReference;
+
+	/** Fixed, labeled interior control, separate from the open/close switch. */
+	UPROPERTY(EditAnywhere, Category="Van|Door", meta=(UseComponentPicker, AllowedClasses="/Script/Engine.PrimitiveComponent"))
+	FComponentReference LockControlReference;
 
 	UPROPERTY(EditDefaultsOnly, Category="Van|Door", meta=(Units="cm"))
 	FVector DoorOpenOffset = FVector::ZeroVector;
@@ -75,8 +86,14 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UPrimitiveComponent> ResolvedInsideSwitch;
 
+	UPROPERTY(Transient)
+	TObjectPtr<UPrimitiveComponent> ResolvedLockControl;
+
 	UPROPERTY(VisibleInstanceOnly, Category="Van|Door")
 	bool bDoorOpen = false;
+
+	UPROPERTY(VisibleInstanceOnly, Category="Van|Door")
+	bool bDoorLocked = false;
 
 	FTransform ClosedDoorTransform;
 	bool bDoorReady = false;

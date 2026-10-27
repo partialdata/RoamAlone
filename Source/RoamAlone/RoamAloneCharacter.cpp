@@ -338,7 +338,7 @@ void ARoamAloneCharacter::UpdatePrototypePrompt()
 		VanPrompt->AddToPlayerScreen();
 	}
 	FString Message = VanViewMode == EVanViewMode::Inside
-		? TEXT("INSIDE | First person\nWalk through the doorway to return outside.")
+		? TEXT("INSIDE | First person\nClose the door, then use the LOCK tab beside the door switch.\nUnlock it and open the door to leave.")
 		: TEXT("OUTSIDE | Third person\nOpen the van door and walk inside.");
 	const FText ActionPrompt = Interaction->GetPrompt();
 	if (!ActionPrompt.IsEmpty())

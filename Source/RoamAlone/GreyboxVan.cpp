@@ -31,6 +31,11 @@ void AGreyboxVan::BeginPlay()
 	ResolvedDoorRoot = Cast<USceneComponent>(DoorRootReference.GetComponent(this));
 	ResolvedDoorPanel = Cast<UStaticMeshComponent>(DoorPanelReference.GetComponent(this));
 	ResolvedInsideSwitch = Cast<UPrimitiveComponent>(InsideSwitchReference.GetComponent(this));
+	ResolvedLockControl = Cast<UPrimitiveComponent>(LockControlReference.GetComponent(this));
+	if (!ResolvedLockControl)
+	{
+		UE_LOG(LogRoamAlone, Warning, TEXT("%s: assign an inside lock control; locking is disabled until it is available."), *GetName());
+	}
 	bDoorReady = ResolvedDoorRoot && ResolvedDoorRoot->GetAttachParent() && ResolvedDoorPanel
 		&& ResolvedDoorPanel->GetStaticMesh() && ResolvedDoorPanel->IsAttachedTo(ResolvedDoorRoot)
 		&& ResolvedInsideSwitch;
@@ -57,7 +62,8 @@ bool AGreyboxVan::IsDoorComponent(const UPrimitiveComponent* Component) const
 
 bool AGreyboxVan::TrySetDoorOpen(bool bOpen)
 {
-	if (bDoorOpen == bOpen || !bDoorReady || !IsValid(ResolvedDoorRoot) || !IsValid(ResolvedDoorPanel))
+	if (bDoorOpen == bOpen || (bOpen && bDoorLocked) || !bDoorReady
+		|| !IsValid(ResolvedDoorRoot) || !IsValid(ResolvedDoorPanel))
 	{
 		return false;
 	}
@@ -82,12 +88,39 @@ bool AGreyboxVan::TrySetDoorOpen(bool bOpen)
 	return true;
 }
 
+bool AGreyboxVan::TrySetLocked(bool bLocked)
+{
+	if (bDoorLocked == bLocked || !bDoorReady || (bLocked && (bDoorOpen || !IsValid(ResolvedLockControl))))
+	{
+		return false;
+	}
+	bDoorLocked = bLocked;
+	return true;
+}
+
 FText AGreyboxVan::GetInteractionPrompt_Implementation(APawn* Interactor, const FHitResult& Hit) const
 {
 	if (!IsValid(Interactor) || Interactor->GetWorld() != GetWorld()
-		|| Hit.GetActor() != this || !IsDoorComponent(Hit.GetComponent()))
+		|| Hit.GetActor() != this || !bDoorReady)
 	{
 		return FText::GetEmpty();
+	}
+	if (IsValid(ResolvedLockControl) && Hit.GetComponent() == ResolvedLockControl)
+	{
+		if (!ContainsInteriorPoint(Interactor->GetActorLocation()))
+		{
+			return FText::GetEmpty();
+		}
+		return bDoorLocked ? NSLOCTEXT("VanInteraction", "UnlockDoor", "Unlock door (locked)")
+			: NSLOCTEXT("VanInteraction", "LockDoor", "Lock door (unlocked)");
+	}
+	if (!IsDoorComponent(Hit.GetComponent()))
+	{
+		return FText::GetEmpty();
+	}
+	if (bDoorLocked)
+	{
+		return NSLOCTEXT("VanInteraction", "LockedHandle", "Try door (locked)");
 	}
 	return bDoorOpen ? NSLOCTEXT("VanInteraction", "CloseDoor", "Close door")
 		: NSLOCTEXT("VanInteraction", "OpenDoor", "Open door");
@@ -98,6 +131,22 @@ bool AGreyboxVan::TryInteract_Implementation(APawn* Interactor, const FHitResult
 	Feedback = FText::GetEmpty();
 	if (GetInteractionPrompt_Implementation(Interactor, Hit).IsEmpty())
 	{
+		return false;
+	}
+	if (Hit.GetComponent() == ResolvedLockControl)
+	{
+		if (!TrySetLocked(!bDoorLocked))
+		{
+			Feedback = NSLOCTEXT("VanInteraction", "CloseBeforeLocking", "Close the door before locking it.");
+			return false;
+		}
+		Feedback = bDoorLocked ? NSLOCTEXT("VanInteraction", "DoorLocked", "Door locked.")
+			: NSLOCTEXT("VanInteraction", "DoorUnlocked", "Door unlocked. Use the door switch to open it.");
+		return true;
+	}
+	if (bDoorLocked)
+	{
+		Feedback = NSLOCTEXT("VanInteraction", "LockedFeedback", "Door is locked. Use the inside LOCK tab to unlock it.");
 		return false;
 	}
 	if (!TrySetDoorOpen(!bDoorOpen))

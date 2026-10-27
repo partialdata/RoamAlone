@@ -56,8 +56,14 @@ walking is slower. Jumping is disabled everywhere through Character Movement's
 `IMC_Default`. Normal walking, gravity, and the 45 cm step-up height remain enabled.
 Window panes block the capsule and
 third-person spring arm; the local body hides the neck/head while the full
-world mesh supplies shadows and reflections. Door animation and locking are
-not part of this slice.
+world mesh supplies shadows and reflections. Door movement is instantaneous.
+
+Inside, aim at the red **LOCK** tab on the side of the inside door-control plate and press
+**E / gamepad X** to lock or unlock. The separate door switch still opens/closes
+the door. Closing does not lock automatically. Locking an open door is refused;
+a locked door refuses opening from either side. Prompts show the current lock
+state and brief feedback explains a refusal. Unlock from inside, then open the
+door normally to leave. No keys or inventory are required.
 
 The player Blueprint uses a deliberate walking pace: **180 cm/s outside**
 (`Character Movement → Max Walk Speed`) and **120 cm/s inside**

@@ -87,7 +87,8 @@ van_defaults.modify()
 for property_name, component_name in (
     ('door_root_reference', 'SlidingDoorRoot'),
     ('door_panel_reference', 'SlidingDoorPanel'),
-    ('inside_switch_reference', 'InsideDoorSwitch')):
+    ('inside_switch_reference', 'InsideDoorSwitch'),
+    ('lock_control_reference', 'InsideLockControl')):
     reference = unreal.ComponentReference()
     reference.set_editor_property('component_property', component_name)
     van_defaults.set_editor_property(property_name, reference)

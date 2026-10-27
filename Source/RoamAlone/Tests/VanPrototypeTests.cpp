@@ -118,6 +118,89 @@ bool FVanDoorSafetyTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVanLockingTest, "RoamAlone.Van.Locking",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVanLockingTest::RunTest(const FString& Parameters)
+{
+	FVanTestWorld Test;
+	if (!TestNotNull(TEXT("Template character loads"), Test.Character)) return false;
+	TestFalse(TEXT("Fresh van starts unlocked"), Test.Van->IsLocked());
+	TestFalse(TEXT("Repeated unlock is a no-op"), Test.Van->TrySetLocked(false));
+	TestTrue(TEXT("Closed door can be locked"), Test.Van->TrySetLocked(true));
+	TestFalse(TEXT("Repeated lock is a no-op"), Test.Van->TrySetLocked(true));
+	TestFalse(TEXT("Native open cannot bypass the lock"), Test.Van->TrySetDoorOpen(true));
+	TestFalse(TEXT("Locked door stays closed"), Test.Van->IsDoorOpen());
+	Test.Move(FVector(-15, -155, 161.1));
+	TestFalse(TEXT("Outside handle refuses opening while locked"), Test.InteractAt(FVector(-15, -101, 185)));
+	TestFalse(TEXT("Refused handle leaves door closed"), Test.Van->IsDoorOpen());
+	TestTrue(TEXT("Refused handle preserves lock"), Test.Van->IsLocked());
+	TestFalse(TEXT("Locked refusal gives feedback"), Test.Character->GetInteractionComponent()->GetFeedback().IsEmpty());
+	TestTrue(TEXT("Gameplay operation can unlock"), Test.Van->TrySetLocked(false));
+	TestTrue(TEXT("Unlocked door opens"), Test.Van->TrySetDoorOpen(true));
+	TestFalse(TEXT("Open door cannot be locked"), Test.Van->TrySetLocked(true));
+	TestFalse(TEXT("Invalid lock preserves unlocked state"), Test.Van->IsLocked());
+	TestTrue(TEXT("Door stays open after invalid lock"), Test.Van->IsDoorOpen());
+	TestTrue(TEXT("Door can close"), Test.Van->TrySetDoorOpen(false));
+	TestFalse(TEXT("Closing does not automatically lock"), Test.Van->IsLocked());
+	for (int32 Run = 0; Run < 10; ++Run)
+	{
+		TestTrue(TEXT("Repeated lock/unlock cycle locks"), Test.Van->TrySetLocked(true));
+		TestFalse(TEXT("Repeated locked opening is refused"), Test.Van->TrySetDoorOpen(true));
+		TestTrue(TEXT("Repeated lock/unlock cycle unlocks"), Test.Van->TrySetLocked(false));
+	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVanInsideLockControlTest, "RoamAlone.Van.InsideLockControl",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVanInsideLockControlTest::RunTest(const FString& Parameters)
+{
+	FVanTestWorld Test;
+	if (!TestNotNull(TEXT("Template character loads"), Test.Character)) return false;
+	TArray<UPrimitiveComponent*> Components;
+	Test.Van->GetComponents(Components);
+	UPrimitiveComponent* LockControl = nullptr;
+	for (UPrimitiveComponent* Component : Components)
+	{
+		if (Component->GetFName() == TEXT("InsideLockControl")) LockControl = Component;
+	}
+	if (!TestNotNull(TEXT("Authored lock control exists"), LockControl)) return false;
+	const FVector LockFace = LockControl->Bounds.Origin;
+	const FVector DoorSwitch(42, -77, 185);
+	Test.Move(FVector(-15, -7.5, 161.1));
+	TestTrue(TEXT("Visible inside control locks through interaction"), Test.InteractAt(LockFace));
+	TestTrue(TEXT("Interaction sets the single authoritative lock"), Test.Van->IsLocked());
+	TestFalse(TEXT("Successful lock gives feedback"), Test.Character->GetInteractionComponent()->GetFeedback().IsEmpty());
+	const FText UnlockPrompt = Test.Character->GetInteractionComponent()->GetPrompt();
+	TestFalse(TEXT("Inside door switch cannot bypass lock"), Test.InteractAt(DoorSwitch));
+	TestTrue(TEXT("Inside lock control freely unlocks"), Test.InteractAt(LockFace));
+	TestFalse(TEXT("Unlocked state applied"), Test.Van->IsLocked());
+	TestFalse(TEXT("Prompt changes to the next valid action"), UnlockPrompt.EqualTo(Test.Character->GetInteractionComponent()->GetPrompt()));
+	TestTrue(TEXT("Inside door switch opens after unlock"), Test.InteractAt(DoorSwitch));
+	TestFalse(TEXT("Lock interaction refuses an open door"), Test.InteractAt(LockFace));
+	TestTrue(TEXT("Rejected lock leaves door open"), Test.Van->IsDoorOpen());
+	TestFalse(TEXT("Rejected lock leaves door unlocked"), Test.Van->IsLocked());
+	TestFalse(TEXT("Open-door refusal explains why"), Test.Character->GetInteractionComponent()->GetFeedback().IsEmpty());
+	TestTrue(TEXT("Inside switch closes without locking"), Test.InteractAt(DoorSwitch));
+	TestTrue(TEXT("Inside control locks again"), Test.InteractAt(LockFace));
+	Test.Move(FVector(-15, -155, 161.1));
+	TestFalse(TEXT("Outside player cannot use inside lock through the van"), Test.InteractAt(LockFace));
+	TestTrue(TEXT("Outside attempt leaves lock intact"), Test.Van->IsLocked());
+	// Revalidate the interior permission even if a caller supplies a stale hit directly.
+	FHitResult StaleHit(Test.Van, LockControl, LockFace, FVector(-1, 0, 0));
+	FText Feedback;
+	TestFalse(TEXT("Stale inside hit cannot unlock from outside"), IInteractable::Execute_TryInteract(Test.Van, Test.Character, StaleHit, Feedback));
+	TestTrue(TEXT("Inside permission revalidation preserves lock"), Test.Van->IsLocked());
+	Test.Move(FVector(-15, -7.5, 161.1));
+	TestTrue(TEXT("Returning inside restores free unlock"), Test.InteractAt(LockFace));
+	TestTrue(TEXT("Door opens to leave"), Test.InteractAt(DoorSwitch));
+	Test.Move(FVector(-15, -400, 161.1));
+	TestEqual(TEXT("Unlocked open exit restores outside mode"), Test.Character->GetVanViewMode(), EVanViewMode::Outside);
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVanCameraRoundTripTest, "RoamAlone.Van.CameraRoundTrips",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 

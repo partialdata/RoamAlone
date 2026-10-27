@@ -14,6 +14,7 @@ class AGreyboxVan;
 class UVanPromptWidget;
 class UInteractionComponent;
 class AFirewoodTask;
+class ANightDirector;
 struct FInputActionValue;
 
 UENUM(BlueprintType)
@@ -94,6 +95,7 @@ public:
 	virtual void CalcCamera(float DeltaTime, FMinimalViewInfo& OutResult) override;
 	virtual void PawnClientRestart() override;
 	void SetNearbyVan(AGreyboxVan* Van);
+	void SetNightDirector(ANightDirector* Director);
 	AGreyboxVan* GetNearbyVan() const;
 
 	UFUNCTION(BlueprintPure, Category="Camera")
@@ -157,6 +159,9 @@ private:
 
 	UPROPERTY(Transient)
 	TWeakObjectPtr<AFirewoodTask> FirewoodTask;
+
+	UPROPERTY(Transient)
+	TWeakObjectPtr<ANightDirector> NightDirector;
 
 	UPROPERTY(VisibleInstanceOnly, Category="Camera")
 	EVanViewMode VanViewMode = EVanViewMode::Outside;

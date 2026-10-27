@@ -19,6 +19,7 @@
 #include "Engine/World.h"
 #include "InteractionComponent.h"
 #include "FirewoodTask.h"
+#include "NightDirector.h"
 #include "Kismet/GameplayStatics.h"
 
 ARoamAloneCharacter::ARoamAloneCharacter()
@@ -196,6 +197,7 @@ void ARoamAloneCharacter::BeginPlay()
 
 void ARoamAloneCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	SetNightDirector(nullptr);
 	Interaction->OnPresentationChanged.RemoveDynamic(this, &ARoamAloneCharacter::HandleInteractionPresentationChanged);
 	if (AFirewoodTask* Task = FirewoodTask.Get())
 	{
@@ -357,12 +359,16 @@ void ARoamAloneCharacter::UpdatePrototypePrompt()
 		: TEXT("OUTSIDE | Third person\nOpen the van door and walk inside.");
 	if (const AFirewoodTask* Task = FirewoodTask.Get())
 	{
-		const FText Objective = Task->GetObjectiveText();
+		const FText Objective = NightDirector.IsValid() ? NightDirector->GetObjectiveText() : Task->GetObjectiveText();
 		if (!Objective.IsEmpty())
 		{
 			Message = TEXT("OBJECTIVE | ") + Objective.ToString() + TEXT("\n")
 				+ (VanViewMode == EVanViewMode::Outside ? TEXT("OUTSIDE | Third person") : Message);
 		}
+	}
+	if (NightDirector.IsValid() && !NightDirector->GetCaptionText().IsEmpty())
+	{
+		Message += TEXT("\n") + NightDirector->GetCaptionText().ToString();
 	}
 	const FText ActionPrompt = Interaction->GetPrompt();
 	if (!ActionPrompt.IsEmpty())
@@ -391,6 +397,20 @@ void ARoamAloneCharacter::PawnClientRestart()
 
 void ARoamAloneCharacter::HandleFirewoodTaskChanged()
 {
+	UpdatePrototypePrompt();
+}
+
+void ARoamAloneCharacter::SetNightDirector(ANightDirector* Director)
+{
+	if (ANightDirector* Previous = NightDirector.Get())
+	{
+		Previous->OnPresentationChanged.RemoveDynamic(this, &ARoamAloneCharacter::HandleFirewoodTaskChanged);
+	}
+	NightDirector = Director;
+	if (Director)
+	{
+		Director->OnPresentationChanged.AddDynamic(this, &ARoamAloneCharacter::HandleFirewoodTaskChanged);
+	}
 	UpdatePrototypePrompt();
 }
 

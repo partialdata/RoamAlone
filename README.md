@@ -112,8 +112,8 @@ implements the existing interaction interface. It rejects placement without
 all three logs, repeated pickups, and placement by another pawn. `ResetTask`
 restores every log, the empty pit and objective; losing the carrier also resets
 the task. A clean PIE run starts fresh. `OnTaskStateChanged` updates the HUD
-without polling after every pickup and on placement. The existing event and
-collected-log count can support later encounter beats; no scare is triggered yet.
+without polling after every pickup and on placement. The placed night director
+observes this same event to start the retreat objective after delivery.
 
 The authored asset is `/Game/VanPrototype/Blueprints/BP_FirewoodTask`. Its
 `PickupLog1`, `PickupLog2`, and `PickupLog3` are independently collectible meshes
@@ -124,7 +124,42 @@ positions the pit independently;
 The pit and placed-wood component references are assigned in the Blueprint defaults.
 Pickup meshes use query collision while available; the placed stack has no
 collision. Keep one task actor in this persistent prototype map: the player
-resolves it once at initialization. No night director or scare sequence is added.
+resolves it once at initialization.
+
+## First encounter
+
+The placed `/Game/VanPrototype/Blueprints/BP_NightDirector` connects the greybox
+loop. Deliver the wood, hear a nearby snap, and return inside. Night begins with
+eight seconds to prepare before footsteps, knocking, and a handle attempt. The
+director reads the van's current state at the attempt: locked holds, unlocked
+opens through `TrySetDoorOpen`, already open stays open, and blocked movement is
+refused. Closing and locking remain the player's choice; no state is forced.
+
+After the attempt, use **E / gamepad X** on the orange **HORN** control below the
+inside door switch. The horn plays once, followed by retreating footsteps, a
+quiet interval, and a fade to morning. At morning the same control offers
+**Restart prototype**, which reloads the map. Captions and objectives explain
+the sequence without requiring sound. Stepping outside before a critical cue
+defers that cue until the player returns; early entry never skips the wood task.
+
+`ANightDirector` owns the short phase sequence and cancellable timers. Its child
+Blueprint assigns the five sounds and assembles the horn prop. Its
+`RequestTimeOfDay` event calls `BP_CampsiteNightSky.ApplyPrototypeTime`; that
+project-owned function disables automatic time advancement and sets UDS time.
+The sequence uses 17:00 for collection, 23:00 for shelter, and 08:00 for morning.
+Vendor content is unchanged. Audio anchors are relative to the van, and the
+placed director is attached to it.
+
+For development, `ResetEncounter` restores the task, timers, sound, time and a
+closed, unlocked door; it refuses an obstructed close. `DebugStartShelter`
+requires the player to be inside and starts the preparation phase after a safe
+reset. Neither method bypasses door clearance or lock validation. Tune the
+preparation and quiet delays in the placed director. No enemy AI, generic quest
+framework, cooking or additional scares are included.
+
+Source WAVs and their pending attribution records are under `SourceAssets/Audio`;
+imported Sound Waves are under `/Game/VanPrototype/Audio`. Exact download pages,
+authors and licenses still need recording before distributing these sounds.
 Run `RoamAlone.Firewood` for state, reset, ownership, obstruction and interaction
 route checks, or `RoamAlone.` for these plus the van regressions.
 
@@ -178,7 +213,10 @@ Add the purchased content to this project at `Content/UltraDynamicSky` before
 opening the prototype map or its sky Blueprint. This public repository excludes
 the vendor pack from version control; it tracks our child Blueprint and map.
 
-Time of Day is **2350 (23:30)**. Time animation, random starting time, system
+The editor preview uses **2350 (23:30)**. During play the night director requests
+**1700 (17:00)** for gathering, **2300 (23:00)** on retreat into the van, and
+**800 (08:00)** at the ending through `ApplyPrototypeTime` on the sky child.
+Time animation, random starting time, system
 time, and randomized cloud formation are disabled for repeatable playtests.
 Cloud Coverage is 5.5, Fog is 0.3, Night Brightness is 0.65, moon intensity is
 0.4, and the moon light color is cool blue. UDS controls exposure with an

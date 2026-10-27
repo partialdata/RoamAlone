@@ -16,24 +16,20 @@ AFirewoodTask::AFirewoodTask()
 void AFirewoodTask::BeginPlay()
 {
 	Super::BeginPlay();
-	PickupRoot = Cast<USceneComponent>(PickupRootReference.GetComponent(this));
 	FirePitRoot = Cast<USceneComponent>(FirePitRootReference.GetComponent(this));
 	PlacedWoodRoot = Cast<USceneComponent>(PlacedWoodRootReference.GetComponent(this));
-	TArray<UPrimitiveComponent*> Primitives;
-	GetComponents(Primitives);
-	for (UPrimitiveComponent* Component : Primitives)
+	bTaskReady = FirePitRoot && PlacedWoodRoot && PlacedWoodRoot->IsAttachedTo(FirePitRoot)
+		&& !PickupReferences.IsEmpty();
+	for (const FComponentReference& Reference : PickupReferences)
 	{
-		if (IsInGroup(Component, PickupRoot))
-		{
-			PickupPrimitives.Add(Component);
-		}
+		UPrimitiveComponent* Log = Cast<UPrimitiveComponent>(Reference.GetComponent(this));
+		bTaskReady &= IsValid(Log) && Log->GetOwner() == this && !IsInGroup(Log, FirePitRoot)
+			&& !PickupPrimitives.Contains(Log);
+		PickupPrimitives.Add(Log);
 	}
-	bTaskReady = PickupRoot && FirePitRoot && PlacedWoodRoot && PickupRoot != FirePitRoot
-		&& PlacedWoodRoot->IsAttachedTo(FirePitRoot) && !FirePitRoot->IsAttachedTo(PickupRoot)
-		&& !PickupPrimitives.IsEmpty();
 	if (!bTaskReady)
 	{
-		UE_LOG(LogRoamAlone, Error, TEXT("%s: assign distinct pickup and fire-pit assemblies, with placed wood under the pit and a usable pickup mesh."), *GetName());
+		UE_LOG(LogRoamAlone, Error, TEXT("%s: assign unique log meshes outside the fire-pit assembly, and placed wood under the pit."), *GetName());
 		return;
 	}
 	UpdatePresentation();
@@ -56,39 +52,46 @@ FText AFirewoodTask::GetObjectiveText() const
 	{
 		return FText::GetEmpty();
 	}
-	switch (TaskState)
+	if (TaskState == EFirewoodTaskState::Placed)
 	{
-	case EFirewoodTaskState::Available:
-		return NSLOCTEXT("FirewoodTask", "CollectObjective", "Collect firewood.");
-	case EFirewoodTaskState::Carrying:
-		return NSLOCTEXT("FirewoodTask", "CarryObjective", "Carrying firewood. Bring it to the fire pit.");
-	case EFirewoodTaskState::Placed:
 		return NSLOCTEXT("FirewoodTask", "CompleteObjective", "Firewood placed. Task complete.");
-	default:
-		return FText::GetEmpty();
 	}
+	return FText::Format(GetCollectedLogCount() < GetRequiredLogCount()
+		? NSLOCTEXT("FirewoodTask", "CollectLogsObjective", "Collect firewood: {0}/{1}.")
+		: NSLOCTEXT("FirewoodTask", "AllLogsObjective", "Firewood: {0}/{1}. Bring it to the fire pit."),
+		FText::AsNumber(GetCollectedLogCount()), FText::AsNumber(GetRequiredLogCount()));
 }
 
-bool AFirewoodTask::TryCollectFirewood(APawn* Interactor)
+bool AFirewoodTask::TryCollectFirewood(APawn* Interactor, UPrimitiveComponent* Log)
 {
-	if (!CanUseTask(Interactor) || TaskState != EFirewoodTaskState::Available)
+	const int32 LogIndex = PickupPrimitives.IndexOfByKey(Log);
+	if (!CanUseTask(Interactor) || TaskState == EFirewoodTaskState::Placed
+		|| LogIndex == INDEX_NONE || CollectedLogIndices.Contains(LogIndex)
+		|| (!CollectedLogIndices.IsEmpty() && Carrier.Get() != Interactor))
 	{
 		return false;
 	}
-	Carrier = Interactor;
-	Interactor->OnDestroyed.AddDynamic(this, &AFirewoodTask::HandleCarrierDestroyed);
-	CommitState(EFirewoodTaskState::Carrying);
+	if (CollectedLogIndices.IsEmpty())
+	{
+		Carrier = Interactor;
+		Interactor->OnDestroyed.AddDynamic(this, &AFirewoodTask::HandleCarrierDestroyed);
+	}
+	CollectedLogIndices.Add(LogIndex);
+	TaskState = EFirewoodTaskState::Carrying;
+	PublishTaskChange();
 	return true;
 }
 
 bool AFirewoodTask::TryPlaceFirewood(APawn* Interactor)
 {
-	if (!CanUseTask(Interactor) || TaskState != EFirewoodTaskState::Carrying || Carrier.Get() != Interactor)
+	if (!CanUseTask(Interactor) || TaskState != EFirewoodTaskState::Carrying || Carrier.Get() != Interactor
+		|| GetCollectedLogCount() != GetRequiredLogCount())
 	{
 		return false;
 	}
 	ClearCarrier();
-	CommitState(EFirewoodTaskState::Placed);
+	TaskState = EFirewoodTaskState::Placed;
+	PublishTaskChange();
 	return true;
 }
 
@@ -104,7 +107,12 @@ void AFirewoodTask::ClearCarrier()
 void AFirewoodTask::ResetTask()
 {
 	ClearCarrier();
-	CommitState(EFirewoodTaskState::Available);
+	if (TaskState != EFirewoodTaskState::Available || !CollectedLogIndices.IsEmpty())
+	{
+		CollectedLogIndices.Reset();
+		TaskState = EFirewoodTaskState::Available;
+		PublishTaskChange();
+	}
 }
 
 void AFirewoodTask::HandleCarrierDestroyed(AActor* DestroyedActor)
@@ -113,13 +121,8 @@ void AFirewoodTask::HandleCarrierDestroyed(AActor* DestroyedActor)
 	ResetTask();
 }
 
-void AFirewoodTask::CommitState(EFirewoodTaskState NewState)
+void AFirewoodTask::PublishTaskChange()
 {
-	if (TaskState == NewState)
-	{
-		return;
-	}
-	TaskState = NewState;
 	UpdatePresentation();
 	OnTaskStateChanged.Broadcast();
 }
@@ -130,13 +133,14 @@ void AFirewoodTask::UpdatePresentation()
 	{
 		return;
 	}
-	const bool bAvailable = TaskState == EFirewoodTaskState::Available;
-	PickupRoot->SetHiddenInGame(!bAvailable, true);
-	for (UPrimitiveComponent* Component : PickupPrimitives)
+	for (int32 Index = 0; Index < PickupPrimitives.Num(); ++Index)
 	{
+		UPrimitiveComponent* Component = PickupPrimitives[Index];
 		if (IsValid(Component))
 		{
-			Component->SetCollisionEnabled(bAvailable ? ECollisionEnabled::QueryOnly : ECollisionEnabled::NoCollision);
+			const bool bCollected = CollectedLogIndices.Contains(Index);
+			Component->SetHiddenInGame(bCollected, true);
+			Component->SetCollisionEnabled(bCollected ? ECollisionEnabled::NoCollision : ECollisionEnabled::QueryOnly);
 		}
 	}
 	PlacedWoodRoot->SetHiddenInGame(TaskState != EFirewoodTaskState::Placed, true);
@@ -148,9 +152,10 @@ FText AFirewoodTask::GetInteractionPrompt_Implementation(APawn* Interactor, cons
 	{
 		return FText::GetEmpty();
 	}
-	if (IsInGroup(Hit.GetComponent(), PickupRoot) && TaskState == EFirewoodTaskState::Available)
+	const int32 LogIndex = PickupPrimitives.IndexOfByKey(Hit.GetComponent());
+	if (LogIndex != INDEX_NONE && !CollectedLogIndices.Contains(LogIndex) && TaskState != EFirewoodTaskState::Placed)
 	{
-		return NSLOCTEXT("FirewoodTask", "CollectPrompt", "Collect firewood bundle");
+		return NSLOCTEXT("FirewoodTask", "CollectLogPrompt", "Collect firewood log");
 	}
 	if (IsInGroup(Hit.GetComponent(), FirePitRoot))
 	{
@@ -168,20 +173,21 @@ bool AFirewoodTask::TryInteract_Implementation(APawn* Interactor, const FHitResu
 	{
 		return false;
 	}
-	if (IsInGroup(Hit.GetComponent(), PickupRoot))
+	if (PickupPrimitives.Contains(Hit.GetComponent()))
 	{
-		return TryCollectFirewood(Interactor);
+		return TryCollectFirewood(Interactor, Hit.GetComponent());
 	}
 	if (TryPlaceFirewood(Interactor))
 	{
 		Feedback = NSLOCTEXT("FirewoodTask", "PlacedFeedback", "Firewood placed. The fire pit is ready.");
 		return true;
 	}
-	Feedback = TaskState == EFirewoodTaskState::Available
-		? NSLOCTEXT("FirewoodTask", "MissingWoodFeedback", "Collect the firewood bundle first.")
-		: TaskState == EFirewoodTaskState::Placed
-			? NSLOCTEXT("FirewoodTask", "AlreadyPlacedFeedback", "The firewood is already at the fire pit.")
-			: NSLOCTEXT("FirewoodTask", "OtherCarrierFeedback", "Only the carrier can place this bundle.");
+	Feedback = TaskState == EFirewoodTaskState::Placed
+		? NSLOCTEXT("FirewoodTask", "AlreadyPlacedFeedback", "The firewood is already at the fire pit.")
+		: GetCollectedLogCount() < GetRequiredLogCount()
+			? FText::Format(NSLOCTEXT("FirewoodTask", "MissingLogsFeedback", "Collect all the firewood first ({0}/{1})."),
+				FText::AsNumber(GetCollectedLogCount()), FText::AsNumber(GetRequiredLogCount()))
+			: NSLOCTEXT("FirewoodTask", "OtherCarrierFeedback", "Only the carrier can place the firewood.");
 	return false;
 }
 

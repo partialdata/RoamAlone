@@ -98,25 +98,30 @@ outside the walkable cargo area for this layout test.
 
 ## Firewood task
 
-`Lvl_VanPrototype` starts with **Collect firewood**. Find the labeled bundle,
-aim at it within reach and press **E / gamepad X**. Carrying is represented by
+`Lvl_VanPrototype` starts with **Collect firewood: 0/3**. Find three scattered logs,
+aim at each within reach and press **E / gamepad X**. Carrying is represented by
 the persistent objective text for this slice; there is no inventory screen or
 new carry animation. At the labeled stone fire pit, aim at its center or rim
-and interact again. The bundle disappears from the pickup and appears in the
-pit, and the objective confirms completion. Lighting the fire and cooking are
+and interact again after collecting all three. Each collected log disappears;
+the complete stack appears in the pit on delivery. An early return explains
+the missing logs and preserves progress. Lighting the fire and cooking are
 not implemented.
 
 `AFirewoodTask` owns the three states (`Available`, `Carrying`, `Placed`) and
 implements the existing interaction interface. It rejects placement without
-the bundle, repeated requests, and placement by another pawn. `ResetTask`
-restores the bundle, empty pit and objective; losing the carrier also resets
+all three logs, repeated pickups, and placement by another pawn. `ResetTask`
+restores every log, the empty pit and objective; losing the carrier also resets
 the task. A clean PIE run starts fresh. `OnTaskStateChanged` updates the HUD
-without polling and provides the completion notification for later encounter work.
+without polling after every pickup and on placement. The existing event and
+collected-log count can support later encounter beats; no scare is triggered yet.
 
 The authored asset is `/Game/VanPrototype/Blueprints/BP_FirewoodTask`. Its
-`PickupAssembly` and `FirePitAssembly` groups position the two props independently;
+`PickupLog1`, `PickupLog2`, and `PickupLog3` are independently collectible meshes
+listed in the Blueprint's `PickupReferences`. Their fixed locations form a short
+route around the clearing; move those meshes to tune the route. `FirePitAssembly`
+positions the pit independently;
 `PlacedWoodAssembly` is a child of the pit and contains the completed wood stack.
-Their corresponding component references are assigned in the Blueprint defaults.
+The pit and placed-wood component references are assigned in the Blueprint defaults.
 Pickup meshes use query collision while available; the placed stack has no
 collision. Keep one task actor in this persistent prototype map: the player
 resolves it once at initialization. No night director or scare sequence is added.

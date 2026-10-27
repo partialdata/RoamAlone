@@ -29,15 +29,21 @@ public:
 	EFirewoodTaskState GetTaskState() const { return TaskState; }
 
 	UFUNCTION(BlueprintPure, Category="Firewood")
+	int32 GetCollectedLogCount() const { return CollectedLogIndices.Num(); }
+
+	UFUNCTION(BlueprintPure, Category="Firewood")
+	int32 GetRequiredLogCount() const { return PickupReferences.Num(); }
+
+	UFUNCTION(BlueprintPure, Category="Firewood")
 	FText GetObjectiveText() const;
 
 	UFUNCTION(BlueprintCallable, Category="Firewood")
-	bool TryCollectFirewood(APawn* Interactor);
+	bool TryCollectFirewood(APawn* Interactor, UPrimitiveComponent* Log);
 
 	UFUNCTION(BlueprintCallable, Category="Firewood")
 	bool TryPlaceFirewood(APawn* Interactor);
 
-	/** Restores the bundle, empty pit and objective; safe to repeat. */
+	/** Restores every log, the empty pit and objective; safe to repeat. */
 	UFUNCTION(BlueprintCallable, Category="Firewood")
 	void ResetTask();
 
@@ -52,8 +58,9 @@ protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
-	UPROPERTY(EditDefaultsOnly, Category="Firewood|Assembly", meta=(UseComponentPicker, AllowedClasses="/Script/Engine.SceneComponent"))
-	FComponentReference PickupRootReference;
+	/** Each referenced mesh is one independently collectible log. All are required. */
+	UPROPERTY(EditDefaultsOnly, Category="Firewood|Assembly", meta=(UseComponentPicker, AllowedClasses="/Script/Engine.PrimitiveComponent"))
+	TArray<FComponentReference> PickupReferences;
 
 	UPROPERTY(EditDefaultsOnly, Category="Firewood|Assembly", meta=(UseComponentPicker, AllowedClasses="/Script/Engine.SceneComponent"))
 	FComponentReference FirePitRootReference;
@@ -66,16 +73,13 @@ private:
 	bool IsInGroup(const UPrimitiveComponent* Component, const USceneComponent* Group) const;
 	void UpdatePresentation();
 	void ClearCarrier();
-	void CommitState(EFirewoodTaskState NewState);
+	void PublishTaskChange();
 
 	UFUNCTION()
 	void HandleCarrierDestroyed(AActor* DestroyedActor);
 
 	UPROPERTY(VisibleAnywhere, Category="Firewood")
 	TObjectPtr<USceneComponent> TaskRoot;
-
-	UPROPERTY(Transient)
-	TObjectPtr<USceneComponent> PickupRoot;
 
 	UPROPERTY(Transient)
 	TObjectPtr<USceneComponent> FirePitRoot;
@@ -92,5 +96,6 @@ private:
 	UPROPERTY(VisibleInstanceOnly, Category="Firewood")
 	EFirewoodTaskState TaskState = EFirewoodTaskState::Available;
 
+	TSet<int32> CollectedLogIndices;
 	bool bTaskReady = false;
 };

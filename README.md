@@ -96,6 +96,33 @@ bed use, seating, and appliance interactions are not implemented.
 All furniture and shell pieces are editable Blueprint components. The cab is
 outside the walkable cargo area for this layout test.
 
+## Firewood task
+
+`Lvl_VanPrototype` starts with **Collect firewood**. Find the labeled bundle,
+aim at it within reach and press **E / gamepad X**. Carrying is represented by
+the persistent objective text for this slice; there is no inventory screen or
+new carry animation. At the labeled stone fire pit, aim at its center or rim
+and interact again. The bundle disappears from the pickup and appears in the
+pit, and the objective confirms completion. Lighting the fire and cooking are
+not implemented.
+
+`AFirewoodTask` owns the three states (`Available`, `Carrying`, `Placed`) and
+implements the existing interaction interface. It rejects placement without
+the bundle, repeated requests, and placement by another pawn. `ResetTask`
+restores the bundle, empty pit and objective; losing the carrier also resets
+the task. A clean PIE run starts fresh. `OnTaskStateChanged` updates the HUD
+without polling and provides the completion notification for later encounter work.
+
+The authored asset is `/Game/VanPrototype/Blueprints/BP_FirewoodTask`. Its
+`PickupAssembly` and `FirePitAssembly` groups position the two props independently;
+`PlacedWoodAssembly` is a child of the pit and contains the completed wood stack.
+Their corresponding component references are assigned in the Blueprint defaults.
+Pickup meshes use query collision while available; the placed stack has no
+collision. Keep one task actor in this persistent prototype map: the player
+resolves it once at initialization. No night director or scare sequence is added.
+Run `RoamAlone.Firewood` for state, reset, ownership, obstruction and interaction
+route checks, or `RoamAlone.` for these plus the van regressions.
+
 ## Reusable interaction
 
 `UInteractionComponent` on the player owns targeting, physical reach and

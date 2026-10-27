@@ -13,6 +13,7 @@ class UInputAction;
 class AGreyboxVan;
 class UVanPromptWidget;
 class UInteractionComponent;
+class AFirewoodTask;
 struct FInputActionValue;
 
 UENUM(BlueprintType)
@@ -147,6 +148,15 @@ private:
 
 	UFUNCTION()
 	void HandleInteractionPresentationChanged(const FText& Prompt, const FText& Feedback);
+
+	UFUNCTION()
+	void HandleFirewoodTaskChanged();
+
+	UFUNCTION()
+	void HandleFirewoodTaskDestroyed(AActor* DestroyedActor);
+
+	UPROPERTY(Transient)
+	TWeakObjectPtr<AFirewoodTask> FirewoodTask;
 
 	UPROPERTY(VisibleInstanceOnly, Category="Camera")
 	EVanViewMode VanViewMode = EVanViewMode::Outside;

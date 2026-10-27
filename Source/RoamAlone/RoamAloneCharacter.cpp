@@ -18,6 +18,8 @@
 #include "Camera/PlayerCameraManager.h"
 #include "Engine/World.h"
 #include "InteractionComponent.h"
+#include "FirewoodTask.h"
+#include "Kismet/GameplayStatics.h"
 
 ARoamAloneCharacter::ARoamAloneCharacter()
 {
@@ -182,12 +184,25 @@ void ARoamAloneCharacter::BeginPlay()
 	GetMesh()->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
 	Interaction->OnPresentationChanged.AddDynamic(this, &ARoamAloneCharacter::HandleInteractionPresentationChanged);
 	Interaction->SetViewSource(FollowCamera);
+	// One persistent campsite task, resolved once; no world searches during movement or targeting.
+	FirewoodTask = Cast<AFirewoodTask>(UGameplayStatics::GetActorOfClass(this, AFirewoodTask::StaticClass()));
+	if (AFirewoodTask* Task = FirewoodTask.Get())
+	{
+		Task->OnTaskStateChanged.AddDynamic(this, &ARoamAloneCharacter::HandleFirewoodTaskChanged);
+		Task->OnDestroyed.AddDynamic(this, &ARoamAloneCharacter::HandleFirewoodTaskDestroyed);
+	}
 	UpdatePrototypePrompt();
 }
 
 void ARoamAloneCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Interaction->OnPresentationChanged.RemoveDynamic(this, &ARoamAloneCharacter::HandleInteractionPresentationChanged);
+	if (AFirewoodTask* Task = FirewoodTask.Get())
+	{
+		Task->OnTaskStateChanged.RemoveDynamic(this, &ARoamAloneCharacter::HandleFirewoodTaskChanged);
+		Task->OnDestroyed.RemoveDynamic(this, &ARoamAloneCharacter::HandleFirewoodTaskDestroyed);
+	}
+	FirewoodTask.Reset();
 	SetVanViewMode(EVanViewMode::Outside);
 	bBlendingCamera = false;
 	UpdateCameraBodyVisibility(false);
@@ -340,6 +355,15 @@ void ARoamAloneCharacter::UpdatePrototypePrompt()
 	FString Message = VanViewMode == EVanViewMode::Inside
 		? TEXT("INSIDE | First person\nClose the door, then use the LOCK tab beside the door switch.\nUnlock it and open the door to leave.")
 		: TEXT("OUTSIDE | Third person\nOpen the van door and walk inside.");
+	if (const AFirewoodTask* Task = FirewoodTask.Get())
+	{
+		const FText Objective = Task->GetObjectiveText();
+		if (!Objective.IsEmpty())
+		{
+			Message = TEXT("OBJECTIVE | ") + Objective.ToString() + TEXT("\n")
+				+ (VanViewMode == EVanViewMode::Outside ? TEXT("OUTSIDE | Third person") : Message);
+		}
+	}
 	const FText ActionPrompt = Interaction->GetPrompt();
 	if (!ActionPrompt.IsEmpty())
 	{
@@ -362,5 +386,16 @@ void ARoamAloneCharacter::HandleInteractionPresentationChanged(const FText& Prom
 void ARoamAloneCharacter::PawnClientRestart()
 {
 	Super::PawnClientRestart();
+	UpdatePrototypePrompt();
+}
+
+void ARoamAloneCharacter::HandleFirewoodTaskChanged()
+{
+	UpdatePrototypePrompt();
+}
+
+void ARoamAloneCharacter::HandleFirewoodTaskDestroyed(AActor* DestroyedActor)
+{
+	FirewoodTask.Reset();
 	UpdatePrototypePrompt();
 }

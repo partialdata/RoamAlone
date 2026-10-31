@@ -2,6 +2,7 @@
 
 #include "Misc/AutomationTest.h"
 #include "FirewoodTask.h"
+#include "VlogTripod.h"
 #include "InteractionComponent.h"
 #include "RoamAloneCharacter.h"
 #include "Components/BoxComponent.h"
@@ -19,8 +20,10 @@ namespace
 		AFirewoodTask* Task = nullptr;
 		ARoamAloneCharacter* Character = nullptr;
 		USceneComponent* View = nullptr;
+		AVlogTripod* Tripod = nullptr;
+		AActor* FilmingSpot = nullptr;
 
-		FFirewoodTestWorld()
+		FFirewoodTestWorld(bool bIncludeTripod = false)
 		{
 			GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
 			FActorSpawnParameters Params;
@@ -35,6 +38,21 @@ namespace
 			// No GameMode login runs in this transient world. UE 5.8 identifies a human pawn by its PlayerState.
 			Controller->SetPlayerState(World->SpawnActor<APlayerState>());
 			Controller->Possess(Character);
+			if (bIncludeTripod)
+			{
+				UClass* TripodClass = LoadClass<AVlogTripod>(nullptr, TEXT("/Game/VanPrototype/Blueprints/BP_VlogTripod.BP_VlogTripod_C"));
+				FilmingSpot = World->SpawnActor<AActor>();
+				USceneComponent* SpotRoot = NewObject<USceneComponent>(FilmingSpot);
+				FilmingSpot->SetRootComponent(SpotRoot);
+				SpotRoot->RegisterComponent();
+				FilmingSpot->SetActorLocation(FVector(-450, -450, 0));
+				if (TripodClass)
+				{
+					Tripod = World->SpawnActor<AVlogTripod>(TripodClass, FVector(-300, -400, 0), FRotator::ZeroRotator, Params);
+					Tripod->FirewoodTask = Task;
+					Tripod->FilmingSpot = FilmingSpot;
+				}
+			}
 			World->InitializeActorsForPlay(FURL());
 			World->GetWorldSettings()->NotifyBeginPlay();
 			View = NewObject<USceneComponent>(Character);
@@ -68,7 +86,83 @@ namespace
 			Character->GetInteractionComponent()->SetViewSource(View);
 			return Character->GetInteractionComponent()->TryInteract();
 		}
+
+		UPrimitiveComponent* PhoneTarget() const
+		{
+			TArray<UPrimitiveComponent*> Components;
+			Tripod->GetComponents(Components);
+			for (UPrimitiveComponent* Component : Components)
+			{
+				if (Component->GetFName() == TEXT("PhoneInteractionTarget")) return Component;
+			}
+			return nullptr;
+		}
+
+		bool CompleteFirewood()
+		{
+			return Task->TryCollectFirewood(Character, Primitive(TEXT("PickupLog1")))
+				&& Task->TryCollectFirewood(Character, Primitive(TEXT("PickupLog2")))
+				&& Task->TryCollectFirewood(Character, Primitive(TEXT("PickupLog3")))
+				&& Task->TryPlaceFirewood(Character);
+		}
 	};
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVlogClipRouteTest, "RoamAlone.Vlog.RecordFirewoodAndReset",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVlogClipRouteTest::RunTest(const FString& Parameters)
+{
+	FFirewoodTestWorld Test(true);
+	if (!TestNotNull(TEXT("Authored tripod loads"), Test.Tripod)) return false;
+	UPrimitiveComponent* Target = Test.PhoneTarget();
+	if (!TestNotNull(TEXT("Forgiving phone target exists"), Target)) return false;
+	const FVector StoredPosition = Test.Tripod->GetActorLocation();
+	TestEqual(TEXT("Clean start needs placement"), Test.Tripod->GetClipState(), EVlogClipState::NeedsPlacement);
+	TestFalse(TEXT("Cannot place tripod from afar"), Test.InteractAt(Target, 400));
+	TestTrue(TEXT("Interaction places tripod"), Test.InteractAt(Target));
+	TestTrue(TEXT("Uses the authored filming position"), Test.Tripod->GetActorLocation().Equals(Test.FilmingSpot->GetActorLocation()));
+	TestTrue(TEXT("Recording starts through interaction"), Test.InteractAt(Target));
+	TestTrue(TEXT("REC state is active"), Test.Tripod->IsRecording());
+	TestTrue(TEXT("Stopping early is allowed"), Test.InteractAt(Target));
+	TestFalse(TEXT("An empty take grants no clip"), Test.Tripod->HasCompletedClip());
+	TestTrue(TEXT("Incomplete take can restart"), Test.InteractAt(Target));
+	TestTrue(TEXT("Task completes normally"), Test.CompleteFirewood());
+	TestEqual(TEXT("Task completion still requires stopping the take"), Test.Tripod->GetClipState(), EVlogClipState::RecordingComplete);
+	TestFalse(TEXT("No clip is granted before stop"), Test.Tripod->HasCompletedClip());
+	TestTrue(TEXT("Stop saves completed take"), Test.InteractAt(Target));
+	TestTrue(TEXT("Exactly one completed clip is available"), Test.Tripod->HasCompletedClip());
+	TestTrue(TEXT("Repeated check is harmless"), Test.InteractAt(Target));
+	TestTrue(TEXT("Checking cannot restart recording"), Test.Tripod->HasCompletedClip() && !Test.Tripod->IsRecording());
+	Test.Task->ResetTask();
+	TestEqual(TEXT("Task reset clears clip and placement"), Test.Tripod->GetClipState(), EVlogClipState::NeedsPlacement);
+	TestTrue(TEXT("Reset restores stored tripod position"), Test.Tripod->GetActorLocation().Equals(StoredPosition));
+	TestFalse(TEXT("Reset restores filming marker"), Test.FilmingSpot->IsHidden());
+	TestTrue(TEXT("Reset permits another placement"), Test.InteractAt(Target));
+	TestTrue(TEXT("Recording restarts after reset"), Test.InteractAt(Target));
+	TestTrue(TEXT("Task repeats after reset"), Test.CompleteFirewood());
+	TestTrue(TEXT("Second take finishes"), Test.InteractAt(Target));
+	TestTrue(TEXT("Second run earns its own clip"), Test.Tripod->HasCompletedClip());
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVlogMissedRecordingTest, "RoamAlone.Vlog.NoRetroactiveClip",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVlogMissedRecordingTest::RunTest(const FString& Parameters)
+{
+	FFirewoodTestWorld Test(true);
+	if (!TestNotNull(TEXT("Tripod loads"), Test.Tripod)) return false;
+	UPrimitiveComponent* Target = Test.PhoneTarget();
+	if (!TestNotNull(TEXT("Phone target exists"), Target)) return false;
+	TestTrue(TEXT("Place camera"), Test.InteractAt(Target));
+	TestTrue(TEXT("Non-filming task still works"), Test.CompleteFirewood());
+	TestFalse(TEXT("Recording cannot claim a finished task"), Test.InteractAt(Target));
+	TestFalse(TEXT("Skipping recording grants no clip"), Test.Tripod->HasCompletedClip());
+	TestFalse(TEXT("Missed recording has feedback"), Test.Character->GetInteractionComponent()->GetFeedback().IsEmpty());
+	Test.Task->ResetTask();
+	TestEqual(TEXT("Reset makes another attempt possible"), Test.Tripod->GetClipState(), EVlogClipState::NeedsPlacement);
+	return true;
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFirewoodStateTest, "RoamAlone.Firewood.StateAndReset",

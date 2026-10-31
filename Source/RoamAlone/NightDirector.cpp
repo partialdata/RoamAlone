@@ -12,6 +12,7 @@
 #include "RoamAloneCharacter.h"
 #include "Sound/SoundBase.h"
 #include "TimerManager.h"
+#include "VlogTripod.h"
 
 ANightDirector::ANightDirector()
 {
@@ -50,8 +51,14 @@ void ANightDirector::InitializeEncounter()
 	}
 	Player->SetNightDirector(this);
 	FirewoodTask->OnTaskStateChanged.AddDynamic(this, &ANightDirector::HandleTaskChanged);
+	if (IsValid(FilmingTripod)) FilmingTripod->OnClipChanged.AddDynamic(this, &ANightDirector::HandleClipChanged);
 	RequestTimeOfDay(1700);
 	HandleTaskChanged();
+}
+
+void ANightDirector::HandleClipChanged()
+{
+	OnPresentationChanged.Broadcast();
 }
 
 void ANightDirector::HandleTaskChanged()
@@ -204,6 +211,7 @@ bool ANightDirector::ResetEncounter()
 	DoorAttemptResult = EDoorAttemptResult::None;
 	SetPhase(ENightPhase::Gathering, FText::GetEmpty());
 	FirewoodTask->ResetTask();
+	if (IsValid(FilmingTripod)) FilmingTripod->ResetClip();
 	RequestTimeOfDay(1700);
 	APlayerController* Controller = Player.IsValid() ? Cast<APlayerController>(Player->GetController()) : nullptr;
 	if (Controller && Controller->PlayerCameraManager) Controller->PlayerCameraManager->StopCameraFade();
@@ -250,8 +258,19 @@ FText ANightDirector::GetObjectiveText() const
 	if (!bReady) return FText::GetEmpty();
 	switch (Phase)
 	{
-	case ENightPhase::Gathering: return IsValid(FirewoodTask) ? FirewoodTask->GetObjectiveText() : FText::GetEmpty();
-	case ENightPhase::Retreat: return NSLOCTEXT("Night", "RetreatObjective", "Get back inside the van.");
+	case ENightPhase::Gathering:
+		if (IsValid(FilmingTripod))
+		{
+			const FText FilmingObjective = FilmingTripod->GetObjectiveText();
+			if (!FilmingObjective.IsEmpty()) return FilmingObjective;
+		}
+		return IsValid(FirewoodTask) ? FirewoodTask->GetObjectiveText() : FText::GetEmpty();
+	case ENightPhase::Retreat:
+		if (IsValid(FilmingTripod) && (FilmingTripod->IsRecording() || FilmingTripod->HasCompletedClip()))
+		{
+			return FilmingTripod->GetObjectiveText();
+		}
+		return NSLOCTEXT("Night", "RetreatObjective", "Get back inside the van.");
 	case ENightPhase::Shelter: return NSLOCTEXT("Night", "ShelterObjective", "Close the door and use the LOCK tab. Stay inside.");
 	case ENightPhase::Approach:
 	case ENightPhase::Knocking: return NSLOCTEXT("Night", "ListenObjective", "Someone is outside. Check the door and stay inside.");
@@ -266,6 +285,7 @@ void ANightDirector::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	GetWorldTimerManager().ClearAllTimersForObject(this);
 	CueAudio->Stop();
 	if (IsValid(FirewoodTask)) FirewoodTask->OnTaskStateChanged.RemoveDynamic(this, &ANightDirector::HandleTaskChanged);
+	if (IsValid(FilmingTripod)) FilmingTripod->OnClipChanged.RemoveDynamic(this, &ANightDirector::HandleClipChanged);
 	if (Player.IsValid()) Player->SetNightDirector(nullptr);
 	Super::EndPlay(EndPlayReason);
 }

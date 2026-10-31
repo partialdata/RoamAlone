@@ -11,6 +11,7 @@ class AGreyboxVan;
 class ARoamAloneCharacter;
 class UAudioComponent;
 class USoundBase;
+class AVlogTripod;
 
 UENUM(BlueprintType)
 enum class ENightPhase : uint8
@@ -39,6 +40,10 @@ public:
 
 	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category="Night")
 	TObjectPtr<AGreyboxVan> Van;
+
+	/** Optional filming objective; the tripod owns clip rules. */
+	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category="Night")
+	TObjectPtr<AVlogTripod> FilmingTripod;
 
 	UPROPERTY(BlueprintAssignable, Category="Night")
 	FNightPresentationChanged OnPresentationChanged;
@@ -108,6 +113,8 @@ private:
 	friend struct FNightEncounterTestWorld;
 	UFUNCTION()
 	void HandleTaskChanged();
+	UFUNCTION()
+	void HandleClipChanged();
 	void InitializeEncounter();
 	void CheckShelter();
 	void AdvanceEncounter();

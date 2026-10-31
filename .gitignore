@@ -26,6 +26,8 @@ DerivedDataCache/
 /Content/Developers/
 # Purchased vendor content: install UDS 9.7 locally; do not redistribute in this public repository.
 /Content/UltraDynamicSky/
+# Imported Fab laptop source assets remain local; see README setup requirements.
+/Content/Fab/Laptop/
 /Build/*/FileOpenOrder/
 /Build/Receipts/
 /StagedBuilds/

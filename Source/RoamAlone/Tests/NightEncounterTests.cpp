@@ -51,6 +51,10 @@ struct FNightEncounterTestWorld
 	}
 
 	bool Ready() const { return Director && Director->bReady; }
+	FHitResult HornHit() const
+	{
+		return FHitResult(Director, Director->ResolvedHornControl, FVector::ZeroVector, FVector::UpVector);
+	}
 	void MoveInside() { Player->SetActorLocation(FVector(-15, 0, 161.1)); }
 	void Advance()
 	{
@@ -114,7 +118,15 @@ bool FNightEncounterRoutes::RunTest(const FString& Parameters)
 		Test.Advance();
 		TestEqual(TEXT("Repeated callback cannot repeat the door attempt"), Test.Director->GetDoorAttemptResult(), Expected[Branch]);
 		TestFalse(TEXT("Null pawn cannot sound horn"), Test.Director->TrySoundHorn(nullptr));
-		TestTrue(TEXT("Inside player sounds horn"), Test.Director->TrySoundHorn(Test.Player));
+		// Exercise Blueprint dispatch as the real interaction system does. Empty child overrides
+		// must not silently replace the native prompt or response.
+		const FHitResult HornHit = Test.HornHit();
+		TestFalse(TEXT("Authored horn exposes its inherited interaction prompt"),
+			IInteractable::Execute_GetInteractionPrompt(Test.Director, Test.Player, HornHit).IsEmpty());
+		FText Feedback;
+		TestTrue(TEXT("Inside player sounds horn through Blueprint interface dispatch"),
+			IInteractable::Execute_TryInteract(Test.Director, Test.Player, HornHit, Feedback));
+		TestEqual(TEXT("Horn interaction starts withdrawal"), Test.Director->GetPhase(), ENightPhase::Withdrawing);
 		TestFalse(TEXT("Repeated horn cannot start duplicate withdrawal"), Test.Director->TrySoundHorn(Test.Player));
 		if (Obstruction) Obstruction->Destroy();
 		Test.Advance();

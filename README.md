@@ -18,6 +18,15 @@ Open `RoamAlone.uproject` in Unreal or Rider and build the editor target as need
 Install RiderLink through Rider when prompted; its local plugin copy is ignored.
 Read `AGENTS.md` before making gameplay changes.
 
+The public repository excludes third-party vendor content. Install UDS 9.7
+locally under `/Game/UltraDynamicSky` as described below. The prototype laptop
+also uses a locally imported Fab model at `/Game/Fab/Laptop/macbookcopy` with its
+supplied materials/textures. Import the same model at that path before using
+`BP_Laptop`; the project-owned Blueprint applies 0.1 mesh scale and is placed
+on the counter beside the sink. The laptop source assets are intentionally
+ignored, like UDS. Its Fab listing/source link still needs to be recorded from
+the original download. A fresh clone does not include either vendor pack.
+
 ## Version control
 
 Commit `.gitignore` and `.gitattributes` together with project source, config,
@@ -164,6 +173,39 @@ Run `RoamAlone.Firewood` for state, reset, ownership, obstruction and interactio
 route checks, or `RoamAlone.` for these plus the van regressions.
 
 ## Reusable interaction
+
+### Optional vlog greybox
+
+`BP_VlogTripod` starts stored beside the campsite. Use E / gamepad X on its phone
+to set it up at the orange `BP_FilmingSpot`, then walk to it and start recording.
+Collect the three logs and place them at the fire pit while REC is active. Return
+to the phone and stop recording to earn one completed campsite clip. The HUD
+guides placement, recording, wood collection, and finishing the take. Movement,
+look and the existing night encounter continue normally; filming is not a night
+progression gate. The branch snap still occurs on firewood delivery.
+The Blueprint's `PhoneInteractionTarget` covers the phone and upper stand so
+third-person targeting does not require hitting the tiny phone mesh precisely.
+It blocks Visibility queries only; normal character reach and obstruction checks
+still apply, and it does not block movement or the camera.
+This first pass simulates one clip only: it does not create video
+files, capture a microphone, upload footage, or switch the player's camera.
+
+`AVlogTripod` owns placement and clip state; the Blueprint assembles the prop
+and implements `UpdateRecordingPresentation` for the recording indicator.
+It uses the existing interaction interface and Enhanced Input route. No ticking
+or new input bindings are added. The director only forwards clip notifications
+to the existing objective HUD and resets the clip on encounter reset. Assign
+`FirewoodTask` and `FilmingSpot` on the placed tripod, and `FilmingTripod` on the
+director. Stopping early gives no clip and allows another take. Finishing the
+wood without recording gives no retroactive clip; the night can still finish.
+One completed clip cannot be overwritten by repeated interaction. A task reset,
+encounter reset, or fresh level clears it and restores the stored tripod and
+filming marker. Laptop review, uploads and the travel montage are later slices.
+
+When inspecting native interactables in Blueprint, leave their inherited
+`GetInteractionPrompt` and `TryInteract` implementations alone unless adding real
+override logic. Empty overrides replace the native behavior. The night tests
+exercise the authored horn through interface dispatch to catch this regression.
 
 `UInteractionComponent` on the player owns targeting, physical reach and
 obstruction checks, focus, and brief action feedback. It polls locally at 10 Hz
